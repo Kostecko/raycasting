@@ -309,10 +309,13 @@ int main() {
         float gms = getMark(sin(protrad));
         float gmc = getMark(cos(protrad));
 
-        for (int i = 0; i < 5; i++) {
+        bool bver = 0;
+        bool bhor = 0;
+
+        for (int i = 0; i < 3; i++) {
             cfpp = { //center float pixel position
                 float((ppom.x + i * gms) * _cellsize + halfcell),
-                float((ppom.y - i * gmc) * _cellsize + halfcell)
+                float((ppom.y - (i + 1) * gmc) * _cellsize + halfcell)
             };
             
             delta = {
@@ -338,22 +341,31 @@ int main() {
             //if (pverm.x == -1) continue;
             if (phorm.x == -1) continue;
 
+            //Jezeli pixel na ktorym umownie stoi punkt nie jest pusty, nie rysuje go i break;
 
-            //if (mapchar[pverm.y][pverm.x - (gms == 1 ? 1 : 0)] != ' ') break;
-            if (mapchar[phorm.y - (gmc == 1 ? 1 : 0)][phorm.x] != ' ') break;
+            if (mapchar[pverm.y][pverm.x - (gms == 1 ? 1 : 0)] != ' ') bver = 1; //GREEN
+            if (mapchar[phorm.y - (gmc == 1 ? 0 : 1)][phorm.x] != ' ') bhor = 1; //MAGENTA
 
-            //if (mapchar[pverm.y][pverm.x - (gms == 1 ? 0 : 1)] != ' ') {
-            //    point.setFillColor(Color::Green);
-            //    point.setPosition(pver);
-            //    raypoints.push_back({ point });
-            //    break;
-            //}
-            //if (mapchar[phorm.y - (gms == 1 ? 0 : 1)][phorm.x] != ' ') {
-            //    point.setFillColor(Color::Magenta);
-            //    point.setPosition(phor);
-            //    raypoints.push_back({ point });
-            //    break;
-            //}
+            if (bver || bhor) break;
+
+            bver = 0;
+            bhor = 0;
+
+            //Jezeli uderza sciany, a pixel na ktorym UMOWNIE stoi jest pusty, rysuje ostatn punkt i break;
+
+            if (mapchar[pverm.y][pverm.x - (gms == 1 ? 0 : 1)] != ' ') { //GREEN
+                point.setFillColor(Color::Green);
+                point.setPosition(pver);
+                raypoints.push_back({ point });
+                break;
+            }
+
+            if (mapchar[phorm.y - (gmc == 1 ? 1 : 0)][phorm.x] != ' ') { //MAGENTA
+                point.setFillColor(Color::Magenta);
+                point.setPosition(phor);
+                raypoints.push_back({ point });
+                break;
+            }
 
             //point.setFillColor(Color::Green);
             //point.setPosition(pver);
@@ -366,15 +378,6 @@ int main() {
 
 
 
-        //TERAZ dla gracza
-        //center float pixel position 
-        // 
-        //pointvec = {
-        //    
-        //};
-        //point.setPosition(pointvec);
-        //point.setFillColor(Color::Magenta);
-        //raypoints.push_back({ point });
         
         ;//MOVING & STEERING
         {
