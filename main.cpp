@@ -133,8 +133,6 @@ void sortray(vector<CircleShape>& vec, Vector2f ppos) {
     vec = output;
 }
 
-
-
 //MAIN
 
 int main() {
@@ -312,12 +310,14 @@ int main() {
         bool bver = 0;
         bool bhor = 0;
 
-        for (int i = 0; i < 3; i++) {
+        vector<Vector2f> rppos; //raypoints position (do sortowania)
+
+        for (int i = 0; i < 5; i++) {
             cfpp = { //center float pixel position
                 float((ppom.x + i * gms) * _cellsize + halfcell),
                 float((ppom.y - (i + 1) * gmc) * _cellsize + halfcell)
             };
-            
+
             delta = {
                 float(cfpp.x + halfcell * gms - ppos.x),
                 float(cfpp.y + halfcell * gmc - ppos.y)
@@ -338,45 +338,58 @@ int main() {
             Vector2i pverm = toMapPos(pver); //Point VERtical on Map
             Vector2i phorm = toMapPos(phor); //Point HORizontal on Map
 
-            //if (pverm.x == -1) continue;
-            if (phorm.x == -1) continue;
+            
 
-            //Jezeli pixel na ktorym umownie stoi punkt nie jest pusty, nie rysuje go i break;
 
-            if (mapchar[pverm.y][pverm.x - (gms == 1 ? 1 : 0)] != ' ') bver = 1; //GREEN
-            if (mapchar[phorm.y - (gmc == 1 ? 0 : 1)][phorm.x] != ' ') bhor = 1; //MAGENTA
 
-            if (bver || bhor) break;
+            //Jezeli pixel na ktorym UMOWNIE stoi punkt nie jest pusty, nie rysuje go i break;
 
-            bver = 0;
-            bhor = 0;
-
-            //Jezeli uderza sciany, a pixel na ktorym UMOWNIE stoi jest pusty, rysuje ostatn punkt i break;
-
-            if (mapchar[pverm.y][pverm.x - (gms == 1 ? 0 : 1)] != ' ') { //GREEN
-                point.setFillColor(Color::Green);
-                point.setPosition(pver);
-                raypoints.push_back({ point });
-                break;
-            }
-
-            if (mapchar[phorm.y - (gmc == 1 ? 1 : 0)][phorm.x] != ' ') { //MAGENTA
-                point.setFillColor(Color::Magenta);
-                point.setPosition(phor);
-                raypoints.push_back({ point });
-                break;
-            }
+            //if (mapchar[pverm.y][pverm.x - (gms == 1 ? 1 : 0)] != ' ') bver = 1; //GREEN
+            //if (mapchar[phorm.y - (gmc == 1 ? 0 : 1)][phorm.x] != ' ') bhor = 1; //MAGENTA
+            //
+            //if (bver || bhor) break;
+            //
+            //bver = 0;
+            //bhor = 0;
+            //
+            ////Jezeli uderza sciany rysuje ostatn punkt i break;
+            //
+            //if (mapchar[pverm.y][pverm.x - (gms == 1 ? 0 : 1)] != ' ') { //GREEN
+            //    point.setFillColor(Color::Green);
+            //    point.setPosition(pver);
+            //    raypoints.push_back({ point });
+            //    break;
+            //}
+            //
+            //if (mapchar[phorm.y - (gmc == 1 ? 1 : 0)][phorm.x] != ' ') { //MAGENTA
+            //    point.setFillColor(Color::Magenta);
+            //    point.setPosition(phor);
+            //    raypoints.push_back({ point });
+            //    break;
+            //}
 
             //point.setFillColor(Color::Green);
-            //point.setPosition(pver);
+            //point.setPosition(pver); 
+            //raypoints.push_back({ point }); 
+            // 
+            //point.setFillColor(Color::Magenta);
+            //point.setPosition(phor);
             //raypoints.push_back({ point });
 
-            point.setFillColor(Color::Magenta);
-            point.setPosition(phor);
-            raypoints.push_back({ point });
+            if (pverm.x != -1) rppos.push_back(pver); //GREEN
+            if (phorm.x != -1) rppos.push_back(phor); //MAGENTA
         }
 
+        sort(rppos.begin(), rppos.end(), [](Vector2f a, Vector2f b) {
+                return (a.x + a.y) < (b.x + b.y);
+            });
 
+
+        for (int i = 1; i <= rppos.size();i++) {
+            point.setFillColor(Color(200.f/i, 200.f/i, 200.f/i));
+            point.setPosition(rppos[i-1]);
+            raypoints.push_back({ point });
+        }
 
         
         ;//MOVING & STEERING
