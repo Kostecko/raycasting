@@ -110,29 +110,6 @@ int getMark(float angle) {
     return 0;
 }
 
-
-void sortray(vector<CircleShape>& vec, Vector2f ppos) {
-    vector<CircleShape> output;
-
-    Vector2f vdist1 = ppos - vec[0].getPosition();
-    Vector2f vdist2 = ppos - vec[1].getPosition();
-
-    float fdist1 = sqrt(vdist1.x * vdist1.x + vdist1.y * vdist1.y);
-    float fdist2 = sqrt(vdist2.x * vdist2.x + vdist2.y * vdist2.y);
-
-    if (fdist1 < fdist2) {
-        output.push_back(vec[0]);
-        output.push_back(vec[1]);
-    }
-    else {
-        output.push_back(vec[1]);
-        output.push_back(vec[0]);
-    }
-
-
-    vec = output;
-}
-
 //MAIN
 
 int main() {
@@ -158,13 +135,14 @@ int main() {
     CircleShape player(10.f);
     CircleShape point(5.f);
 
+    Font font("d:/fonts/Retro.ttf");
     Vector2f offset;
     Vector2f ppos;
     Texture ptxt;
     vector<RectangleShape>map;
     vector<RectangleShape>lines;
     vector<float> lens;
-    vector<vector<CircleShape>> raypoints;
+    vector<CircleShape> raypoints;
     vector<RectangleShape>gridLines;
     vector<Vector2i> nbpix;
 
@@ -333,65 +311,50 @@ int main() {
                 ppos.y + delta.y
             };
 
-            //pointvec.x jest graniczny, punkt jest na nastepnym pixelu
-
             Vector2i pverm = toMapPos(pver); //Point VERtical on Map
             Vector2i phorm = toMapPos(phor); //Point HORizontal on Map
-
-            
-
-
-
-            //Jezeli pixel na ktorym UMOWNIE stoi punkt nie jest pusty, nie rysuje go i break;
-
-            //if (mapchar[pverm.y][pverm.x - (gms == 1 ? 1 : 0)] != ' ') bver = 1; //GREEN
-            //if (mapchar[phorm.y - (gmc == 1 ? 0 : 1)][phorm.x] != ' ') bhor = 1; //MAGENTA
-            //
-            //if (bver || bhor) break;
-            //
-            //bver = 0;
-            //bhor = 0;
-            //
-            ////Jezeli uderza sciany rysuje ostatn punkt i break;
-            //
-            //if (mapchar[pverm.y][pverm.x - (gms == 1 ? 0 : 1)] != ' ') { //GREEN
-            //    point.setFillColor(Color::Green);
-            //    point.setPosition(pver);
-            //    raypoints.push_back({ point });
-            //    break;
-            //}
-            //
-            //if (mapchar[phorm.y - (gmc == 1 ? 1 : 0)][phorm.x] != ' ') { //MAGENTA
-            //    point.setFillColor(Color::Magenta);
-            //    point.setPosition(phor);
-            //    raypoints.push_back({ point });
-            //    break;
-            //}
-
-            //point.setFillColor(Color::Green);
-            //point.setPosition(pver); 
-            //raypoints.push_back({ point }); 
-            // 
-            //point.setFillColor(Color::Magenta);
-            //point.setPosition(phor);
-            //raypoints.push_back({ point });
 
             if (pverm.x != -1) rppos.push_back(pver); //GREEN
             if (phorm.x != -1) rppos.push_back(phor); //MAGENTA
         }
 
-        sort(rppos.begin(), rppos.end(), [](Vector2f a, Vector2f b) {
-                return (a.x + a.y) < (b.x + b.y);
+        sort(rppos.begin(), rppos.end(), [ppos](Vector2f a, Vector2f b) {
+            a.x -= ppos.x; a.y -= ppos.y;
+            b.x -= ppos.x; b.y -= ppos.y;
+                return sqrt(a.x*a.x + a.y*a.y) < sqrt(b.x * b.x + b.y * b.y);
             });
 
 
-        for (int i = 1; i <= rppos.size();i++) {
-            point.setFillColor(Color(200.f/i, 200.f/i, 200.f/i));
-            point.setPosition(rppos[i-1]);
+        for (auto& rp : rppos) {
+            bool isVer = (int(rp.x) % 80 == 0 ? true : false);
+            Vector2i rpm = toMapPos(rp);
+
+            if (rpm.x == -1) continue;
+
+            if (isVer) {
+
+                if (mapchar[rpm.y][rpm.x - (gms == 1 ? 1 : 0)] != ' ') break;
+
+                if (mapchar[rpm.y][rpm.x - (gms == 1 ? 0 : 1)] != ' ') {
+                    point.setPosition(rp);
+                    raypoints.push_back({ point });
+                    break;
+                }
+            }
+            else {
+                if (mapchar[rpm.y - (gmc == 1 ? 0 : 1)][rpm.x] != ' ') break;
+
+                if (mapchar[rpm.y - (gmc == 1 ? 1 : 0)][rpm.x] != ' ') {
+                    point.setPosition(rp);
+                    raypoints.push_back({ point });
+                    break;
+                }
+            }
+
+            point.setPosition(rp);
             raypoints.push_back({ point });
         }
 
-        
         ;//MOVING & STEERING
         {
 
@@ -485,17 +448,23 @@ int main() {
 
             //window2d.draw(line);
 
-            window2d.draw(player);
-
-            for (auto& v : raypoints)
-                for(auto& p : v)
-                    window2d.draw(p);
-
-            if(grid)
+            if (grid)
                 for (auto& g : gridLines)
                     window2d.draw(g);
 
-            //window2d.draw(point);
+            window2d.draw(player);
+
+            //int i = 0;
+            for (auto& p : raypoints) {
+                //Vector2f pp = p.getPosition();
+                //i++;
+                //sqrt(pp.x * pp.x + pp.y * pp.y)
+                //Text txt(font, format("{}", i), 12);
+                //txt.setPosition({pp.x - 6, pp.y + 6});
+                //window2d.draw(txt);
+                window2d.draw(p);
+            }
+            
 
             //3D VIEW
 
