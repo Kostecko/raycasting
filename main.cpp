@@ -17,10 +17,10 @@ const int _cellsize = 80;
 const float speed = 200;
 const float rotspeed = 90;
 
-const int fov = 30;
+const int fov = 60;
 const float fovaccuracy = 60;
 
-/**/
+/*
 vector<string> mapchar = {
     "          ",
     " ######## ",
@@ -33,7 +33,7 @@ vector<string> mapchar = {
     " ######## ",
     "          "
 };
-
+*/
 /*
 const vector<string> mapchar = {
     "##########",
@@ -50,7 +50,18 @@ const vector<string> mapchar = {
 };*/
 
 
-
+const vector<string> mapchar = {
+    "##########",
+    "#        #",
+    "# ##  ## #",
+    "##      ##",
+    "#  #  #  #",
+    "#        #",
+    "#  #  #  #",
+    "#  ####  #",
+    "#        #",
+    "##########"
+};
 
 
 
@@ -58,7 +69,7 @@ const vector<string> mapchar = {
 
 bool grid = 1;
 bool win2dVisible = 1;
-bool win3dVisible = 0;
+bool win3dVisible = 1;
 bool consoleVisible = 0;
 
 
@@ -81,27 +92,13 @@ Vector2b collision(Vector2f pos, float radius, Vector2f offset, float dt) {
     int newx = floor((pos.x + offset.x * dt * speed + offset.x * radius)/_cellsize);
     int newy = floor((pos.y + offset.y * dt * speed + offset.y * radius)/_cellsize);
 
-    bool x = false;;
-    bool y = false;
-
-
-    if (mapchar[oldy][newx] == '#') {
-        x = true;
-    }
-    if (mapchar[newy][oldx] == '#') {
-        y = true;
-    }
-
-    return { x, y };
+    return { mapchar[oldy][newx] == '#', mapchar[newy][oldx] == '#' };
 }
 
 Vector2i toMapPos(Vector2f pos){
-    static int errorcounter = 0;
-    if (pos.x < 0 || pos.x > _winwidth || pos.y < 0 || pos.y > _winheight) {
-        //printf("toMapPos() error!\ttimes: %i\n", errorcounter); errorcounter++; 
-        return { -1,-1 };
-    }
-    return { static_cast<int>(pos.x / _cellsize), static_cast<int>(pos.y / _cellsize) };
+    if (pos.x < 0 || pos.x >= _winwidth || pos.y < 0 || pos.y >= _winheight || !isfinite(pos.x) || !isfinite(pos.y)) return { -1,-1 };
+
+    return { int(pos.x / _cellsize), int(pos.y / _cellsize) };
 }
 
 int getMark(float angle) {
@@ -126,25 +123,33 @@ int main() {
 
     float protrad;
     float protdeg;
+    float gms;
+    float gmc;
+
     int n = 0;
     bool moving = false;
+    
+    float halfcell = _cellsize / 2.f;
 
     RectangleShape cellshape(Vector2f(_cellsize, _cellsize));
     RectangleShape block;
     RectangleShape line({ 1, 200 });
     CircleShape player(10.f);
-    CircleShape point(5.f);
+    CircleShape point(2.5);
 
     Font font("d:/fonts/Retro.ttf");
+
     Vector2f offset;
     Vector2f ppos;
     Texture ptxt;
+
     vector<RectangleShape>map;
-    vector<RectangleShape>lines;
+
     vector<float> lens;
+    vector<RectangleShape>lines;
     vector<CircleShape> raypoints;
+
     vector<RectangleShape>gridLines;
-    vector<Vector2i> nbpix;
 
     ptxt.loadFromFile("triangle.png");
 
@@ -159,18 +164,16 @@ int main() {
     
     block.setFillColor(Color::Blue);
 
-    point.setOrigin({ 5,5 });
+    point.setOrigin({ 2.5,2.5 });
 
     while (window2d.isOpen() && window3d.isOpen()) {
         while (const optional event = window2d.pollEvent()){
             if (event->is<Event::Closed>()) 
                 window2d.close();
                 
-            if (const auto* keypressed = event->getIf<Event::KeyPressed>()) {
+            if (const auto* keypressed = event->getIf<Event::KeyPressed>()) 
                 if (keypressed->scancode == Keyboard::Scancode::Space)
                     cout << "BREAKPOINT!\n";
-            }
-
         }
         while (const optional event = window3d.pollEvent()) {
             if (event->is<Event::Closed>())
@@ -196,6 +199,7 @@ int main() {
 
             protrad = player.getRotation().asRadians();
             protdeg = player.getRotation().asDegrees();
+             
             ppos = player.getPosition();
 
             lines.clear();
@@ -204,7 +208,7 @@ int main() {
             raypoints.clear();
             gridLines.clear();
 
-            /**/
+            /*
             mapchar = {
                 "##########",
                 "#        #",
@@ -216,7 +220,7 @@ int main() {
                 "#  ####  #",
                 "#        #",
                 "##########"
-            };
+            };*/
         }
 
         //2D MAP GRID
@@ -273,87 +277,91 @@ int main() {
             //    lines.push_back(line);
         }
 
-
-        float halfcell = _cellsize / 2.f;
-
         Vector2i ppom = toMapPos(ppos);
-        Vector2f cfpp;
-        Vector2f pver;
-        Vector2f phor;
-        Vector2f delta;
+        for(int f = -fov/2;f<fov/2;f++){
+            float angdeg = protdeg + f;
+            float angrad = degrees(angdeg).asRadians();
 
-        float gms = getMark(sin(protrad));
-        float gmc = getMark(cos(protrad));
+            gms = getMark(sin(angrad));
+            gmc = getMark(cos(angrad));
 
-        bool bver = 0;
-        bool bhor = 0;
+            vector<Vector2f> rppos; //raypoints position (do sortowania)
 
-        vector<Vector2f> rppos; //raypoints position (do sortowania)
+            for (int i = 0;i<10; i++) {
+                Vector2f cfpp = { //center float pixel position
+                    float((ppom.x + i * gms) * _cellsize + halfcell),
+                    float((ppom.y - (i + 1) * gmc) * _cellsize + halfcell)
+                };
+                Vector2f delta = { //player to pixel barrier distance
+                    float(cfpp.x + halfcell * gms - ppos.x),
+                    float(cfpp.y + halfcell * gmc - ppos.y)
+                };
 
-        for (int i = 0; i < 5; i++) {
-            cfpp = { //center float pixel position
-                float((ppom.x + i * gms) * _cellsize + halfcell),
-                float((ppom.y - (i + 1) * gmc) * _cellsize + halfcell)
-            };
+                //if (cfpp.x < 0 || cfpp.x >= _winwidth || cfpp.y < 0 || cfpp.y >= _winheight) break;
 
-            delta = {
-                float(cfpp.x + halfcell * gms - ppos.x),
-                float(cfpp.y + halfcell * gmc - ppos.y)
-            };
-
-            pver = {
-                ppos.x + delta.x,
-                ppos.y - delta.x / tan(protrad)
-            };
-
-            phor = {
-                ppos.x - delta.y * tan(protrad),
-                ppos.y + delta.y
-            };
-
-            Vector2i pverm = toMapPos(pver); //Point VERtical on Map
-            Vector2i phorm = toMapPos(phor); //Point HORizontal on Map
-
-            if (pverm.x != -1) rppos.push_back(pver); //GREEN
-            if (phorm.x != -1) rppos.push_back(phor); //MAGENTA
-        }
-
-        sort(rppos.begin(), rppos.end(), [ppos](Vector2f a, Vector2f b) {
-            a.x -= ppos.x; a.y -= ppos.y;
-            b.x -= ppos.x; b.y -= ppos.y;
-                return sqrt(a.x*a.x + a.y*a.y) < sqrt(b.x * b.x + b.y * b.y);
-            });
-
-
-        for (auto& rp : rppos) {
-            bool isVer = (int(rp.x) % 80 == 0 ? true : false);
-            Vector2i rpm = toMapPos(rp);
-
-            if (rpm.x == -1) continue;
-
-            if (isVer) {
-
-                if (mapchar[rpm.y][rpm.x - (gms == 1 ? 1 : 0)] != ' ') break;
-
-                if (mapchar[rpm.y][rpm.x - (gms == 1 ? 0 : 1)] != ' ') {
-                    point.setPosition(rp);
-                    raypoints.push_back({ point });
-                    break;
+                if (angdeg != 0 && angdeg != 180 && angdeg != 360) {
+                    Vector2f pver = { //vertical point position
+                        ppos.x + delta.x,
+                        ppos.y - (tan(angrad) == 0 ? 0 : delta.x / tan(angrad))
+                    };
+                    Vector2i pverm = toMapPos(pver); //Point VERtical on Map
+                    if (pverm.x != -1) rppos.push_back(pver); //GREEN
                 }
-            }
-            else {
-                if (mapchar[rpm.y - (gmc == 1 ? 0 : 1)][rpm.x] != ' ') break;
 
-                if (mapchar[rpm.y - (gmc == 1 ? 1 : 0)][rpm.x] != ' ') {
-                    point.setPosition(rp);
-                    raypoints.push_back({ point });
-                    break;
+                if (angdeg != 90 && angdeg != 270) {
+                    Vector2f phor = { //horizontal point position
+                        ppos.x - delta.y * tan(angrad),
+                        ppos.y + delta.y
+                    };
+                    Vector2i phorm = toMapPos(phor); //Point HORizontal on Map
+                    if (phorm.x != -1) rppos.push_back(phor); //MAGENTA
                 }
             }
 
-            point.setPosition(rp);
-            raypoints.push_back({ point });
+            sort(rppos.begin(), rppos.end(), [ppos](Vector2f a, Vector2f b) {
+                a.x -= ppos.x; a.y -= ppos.y;
+                b.x -= ppos.x; b.y -= ppos.y;
+                return sqrt(a.x * a.x + a.y * a.y) < sqrt(b.x * b.x + b.y * b.y); });
+
+            for (auto& rp : rppos) {
+                bool isVer = (int(rp.x) % 80 == 0 ? true : false);
+                Vector2i rpm = toMapPos(rp);
+
+                if (rpm.x == -1) continue;
+
+                if (isVer) {
+
+                    if (mapchar[rpm.y][rpm.x - (gms == 1 ? 1 : 0)] != ' ') break;
+
+                    if (mapchar[rpm.y][rpm.x - (gms == 1 ? 0 : 1)] != ' ') {
+                        point.setPosition(rp);
+                        raypoints.push_back(point);
+                        break;
+                    }
+                }
+                else {
+                    if (mapchar[rpm.y - (gmc == 1 ? 0 : 1)][rpm.x] != ' ') break;
+
+                    if (mapchar[rpm.y - (gmc == 1 ? 1 : 0)][rpm.x] != ' ') {
+                        point.setPosition(rp);
+                        raypoints.push_back(point);
+                        break;
+                    }
+                }
+
+                //point.setPosition(rp);
+                //raypoints.push_back({ point });
+            }
         }
+
+        for (auto p : raypoints) {
+            float x = ppos.x - p.getPosition().x;
+            float y = ppos.y - p.getPosition().y;
+
+            float len = sqrt(x*x + y*y);
+            lens.push_back(len);
+        }
+
 
         ;//MOVING & STEERING
         {
@@ -446,30 +454,21 @@ int main() {
             for (auto& l : lines)
                 window2d.draw(l);
 
-            //window2d.draw(line);
-
             if (grid)
                 for (auto& g : gridLines)
                     window2d.draw(g);
 
             window2d.draw(player);
 
-            //int i = 0;
-            for (auto& p : raypoints) {
-                //Vector2f pp = p.getPosition();
-                //i++;
-                //sqrt(pp.x * pp.x + pp.y * pp.y)
-                //Text txt(font, format("{}", i), 12);
-                //txt.setPosition({pp.x - 6, pp.y + 6});
-                //window2d.draw(txt);
+            for (auto& p : raypoints) 
                 window2d.draw(p);
-            }
+            
             
 
             //3D VIEW
 
-            //for (auto& b : map)
-            //    window3d.draw(b);
+            for (auto& b : map)
+                window3d.draw(b);
 
             window2d.display();
             window3d.display();
