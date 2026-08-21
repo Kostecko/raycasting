@@ -173,7 +173,7 @@ int main() {
                 
             if (const auto* keypressed = event->getIf<Event::KeyPressed>()) 
                 if (keypressed->scancode == Keyboard::Scancode::Space)
-                    cout << "BREAKPOINT!\n";
+                        cout << "BREAKPOINT!\n";
         }
         while (const optional event = window3d.pollEvent()) {
             if (event->is<Event::Closed>())
@@ -313,14 +313,12 @@ int main() {
 
                 int x, y;
 
-                x = isVer ? (rpm.x - (gms == 1 ? 1 : 0)) : rpm.x;
-                y = !isVer ? (rpm.y - (gmc == 1 ? 0 : 1)) : rpm.y;
-
+                x = rpm.x - int((gms > 0) * isVer);
+                y = rpm.y - int(!(gmc > 0) * !isVer);
                 if (mapchar[y][x] != ' ') break;
 
-                x = isVer ? rpm.x - (gms == 1 ? 0 : 1) : rpm.x;
-                y = !isVer ? rpm.y - (gmc == 1 ? 1 : 0) : rpm.y;
-
+                x = rpm.x - int(!(gms > 0) * isVer);
+                y = rpm.y - int((gmc > 0) * !isVer);
                 if (mapchar[y][x] != ' ') {
                     point.setPosition(rp);
                     raypoints.push_back(point);
@@ -328,9 +326,6 @@ int main() {
                 }
             }
         }
-
-        
-
 
         for (auto p : raypoints) {
             float x = ppos.x - p.getPosition().x;
