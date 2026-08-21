@@ -14,11 +14,11 @@ const int _winwidth = 800;
 const int _winheight = 800;
 const int _cellsize = 80;
 
-const float speed = 200;
+const float speed = 80;
 const float rotspeed = 90;
 
 const int fov = 60;
-const float fovaccuracy = 60;
+const float fovaccuracy = 120;
 
 /*
 vector<string> mapchar = {
@@ -193,7 +193,7 @@ int main() {
 
         //VARIABLES
         {
-            window2d.setTitle(to_string(int(1.f/dt)));
+            window2d.setTitle("2D\tFPS: " + to_string(int(1.f / dt)));
 
             dt = clock.restart().asSeconds();
 
@@ -258,27 +258,11 @@ int main() {
             line.setSize({ 1,1000 });
             line.setOrigin({ 0.5,1000 });
             lines.push_back(line);
-            //point.setOrigin({ 5,5 });
-            //point.setFillColor(Color::Green);
-            //point.setPosition({ ppos.x - xdist, ppos.y + xdist / tan(protrad) });
-            //    raypoints.push_back(point);
-            //point.setFillColor(Color::Magenta);
-            //point.setPosition({ ppos.x + tan(protrad) * ydist,ppos.y - ydist });
-            //    raypoints.push_back(point);
-            //line.setFillColor(Color::Green);
-            //line.setRotation(degrees(0));
-            //line.setSize({ xdist,1 });
-            //line.setOrigin({ xdist,0.5 });
-            //    lines.push_back(line);
-            //line.setFillColor(Color::Magenta);
-            //line.setRotation(degrees(0));
-            //line.setSize({ 1, ydist });
-            //line.setOrigin({ 0.5,ydist });
-            //    lines.push_back(line);
         }
 
         Vector2i ppom = toMapPos(ppos);
-        for(int f = -fov/2;f<fov/2;f++){
+
+        for(float f = -fov/2.f;f<fov/2.f;f+=(fov/fovaccuracy)){
             float angdeg = protdeg + f;
             float angrad = degrees(angdeg).asRadians();
 
@@ -296,8 +280,6 @@ int main() {
                     float(cfpp.x + halfcell * gms - ppos.x),
                     float(cfpp.y + halfcell * gmc - ppos.y)
                 };
-
-                //if (cfpp.x < 0 || cfpp.x >= _winwidth || cfpp.y < 0 || cfpp.y >= _winheight) break;
 
                 if (angdeg != 0 && angdeg != 180 && angdeg != 360) {
                     Vector2f pver = { //vertical point position
@@ -329,30 +311,26 @@ int main() {
 
                 if (rpm.x == -1) continue;
 
-                if (isVer) {
+                int x, y;
 
-                    if (mapchar[rpm.y][rpm.x - (gms == 1 ? 1 : 0)] != ' ') break;
+                x = isVer ? (rpm.x - (gms == 1 ? 1 : 0)) : rpm.x;
+                y = !isVer ? (rpm.y - (gmc == 1 ? 0 : 1)) : rpm.y;
 
-                    if (mapchar[rpm.y][rpm.x - (gms == 1 ? 0 : 1)] != ' ') {
-                        point.setPosition(rp);
-                        raypoints.push_back(point);
-                        break;
-                    }
+                if (mapchar[y][x] != ' ') break;
+
+                x = isVer ? rpm.x - (gms == 1 ? 0 : 1) : rpm.x;
+                y = !isVer ? rpm.y - (gmc == 1 ? 1 : 0) : rpm.y;
+
+                if (mapchar[y][x] != ' ') {
+                    point.setPosition(rp);
+                    raypoints.push_back(point);
+                    break;
                 }
-                else {
-                    if (mapchar[rpm.y - (gmc == 1 ? 0 : 1)][rpm.x] != ' ') break;
-
-                    if (mapchar[rpm.y - (gmc == 1 ? 1 : 0)][rpm.x] != ' ') {
-                        point.setPosition(rp);
-                        raypoints.push_back(point);
-                        break;
-                    }
-                }
-
-                //point.setPosition(rp);
-                //raypoints.push_back({ point });
             }
         }
+
+        
+
 
         for (auto p : raypoints) {
             float x = ppos.x - p.getPosition().x;
@@ -373,11 +351,11 @@ int main() {
                 player.rotate(degrees(-rotspeed * dt));
             }
 
-            if (Keyboard::isKeyPressed(Keyboard::Key::W)) {
+            if (Keyboard::isKeyPressed(Keyboard::Key::W) || Keyboard::isKeyPressed(Keyboard::Key::Up)) {
                 offset = { sin(protrad), -cos(protrad) };
                 moving = true;
             }
-            if (Keyboard::isKeyPressed(Keyboard::Key::S)) {
+            if (Keyboard::isKeyPressed(Keyboard::Key::S) || Keyboard::isKeyPressed(Keyboard::Key::Down)) {
                 offset = { -sin(protrad), cos(protrad) };
                 moving = true;
             }
