@@ -1,9 +1,9 @@
-﻿#include <SFML/Graphics.hpp>
+#include <SFML/Graphics.hpp>
 #include <iostream>
 #include <vector>
 #include <numbers>
 #include <cmath>
-#include <windows.h>
+#include <algorithm>
 
 using namespace std;
 using namespace sf;
@@ -115,7 +115,6 @@ int main() {
 
     window2d.setVisible(win2dVisible);
     window3d.setVisible(win3dVisible);
-    ShowWindow(GetConsoleWindow(), consoleVisible);
     
 
     Clock clock;
@@ -137,7 +136,7 @@ int main() {
     CircleShape player(10.f);
     CircleShape point(2.5);
 
-    Font font("d:/fonts/Retro.ttf");
+    Font font("assets/Retro.ttf");
 
     Vector2f offset;
     Vector2f ppos;
@@ -151,7 +150,7 @@ int main() {
 
     vector<RectangleShape>gridLines;
 
-    ptxt.loadFromFile("triangle.png");
+    ptxt.loadFromFile("assets/triangle.png");
 
     cellshape.setFillColor(Color::Blue);
 
@@ -245,11 +244,6 @@ int main() {
         }
 
 
-
-        
-        
-
-
         //LINEs {}
         {
             line.setFillColor(Color::Red);
@@ -271,69 +265,57 @@ int main() {
 
             vector<Vector2f> rppos; //raypoints position (do sortowania)
 
-            for (int i = 0;i<10; i++) {
-                Vector2f cfpp = { //center float pixel position
-                    float((ppom.x + i * gms) * _cellsize + halfcell),
-                    float((ppom.y - (i + 1) * gmc) * _cellsize + halfcell)
-                };
-                Vector2f delta = { //player to pixel barrier distance
-                    float(cfpp.x + halfcell * gms - ppos.x),
-                    float(cfpp.y + halfcell * gmc - ppos.y)
-                };
+            //NOWE PODEJSCIE, PROBUJE ZROBIC DDA
 
-                if (angdeg != 0 && angdeg != 180 && angdeg != 360) {
-                    Vector2f pver = { //vertical point position
-                        ppos.x + delta.x,
-                        ppos.y - (tan(angrad) == 0 ? 0 : delta.x / tan(angrad))
-                    };
-                    Vector2i pverm = toMapPos(pver); //Point VERtical on Map
-                    if (pverm.x != -1) rppos.push_back(pver); //GREEN
-                }
+            Vector2f vertical;
+            Vector2f horizontal;
 
-                if (angdeg != 90 && angdeg != 270) {
-                    Vector2f phor = { //horizontal point position
-                        ppos.x - delta.y * tan(angrad),
-                        ppos.y + delta.y
-                    };
-                    Vector2i phorm = toMapPos(phor); //Point HORizontal on Map
-                    if (phorm.x != -1) rppos.push_back(phor); //MAGENTA
+            float dx = _cellsize * (gms == 1? 1.f:0.f) - fmod(ppos.x, _cellsize);
+            float dy = _cellsize * (gmc == 1? 0:1) - fmod(ppos.y, _cellsize);
+
+            for(int i =0;i<10;i++){
+                float xoff = dx + _cellsize * i * gms;
+                float rpx = ppos.x + xoff;
+                float rpy = ppos.y - (tan(angrad) == 0 ? 0 : xoff / tan(angrad));
+
+                Vector2i rpi = toMapPos({rpx, rpy});
+
+                if(rpi.x == -1) continue;
+
+                if(mapchar[rpi.y][rpi.x - (gms==1? 0:1)] != ' '){
+                    vertical = {rpx, rpy};
+                    break;
+                    //sqrt((ppos.x - rpx) * (ppos.x - rpx) + (ppos.y - rpy) * (ppos.y - rpy));
                 }
             }
 
-            sort(rppos.begin(), rppos.end(), [ppos](Vector2f a, Vector2f b) {
-                a.x -= ppos.x; a.y -= ppos.y;
-                b.x -= ppos.x; b.y -= ppos.y;
-                return sqrt(a.x * a.x + a.y * a.y) < sqrt(b.x * b.x + b.y * b.y); });
+            for(int i =0;i<10;i++){
+                float yoff = dy - _cellsize * i * gmc;
+                
+                float rpx = ppos.x - yoff * tan(angrad);
+                float rpy = ppos.y + yoff;
 
-            for (auto& rp : rppos) {
-                bool isVer = (int(rp.x) % 80 == 0 ? true : false);
-                Vector2i rpm = toMapPos(rp);
+                Vector2i rpi = toMapPos({rpx, rpy});
 
-                if (rpm.x == -1) continue;
+                if(rpi.x == -1) continue;
 
-                int x, y;
-
-                x = rpm.x - int((gms > 0) * isVer);
-                y = rpm.y - int(!(gmc > 0) * !isVer);
-                if (mapchar[y][x] != ' ') break;
-
-                x = rpm.x - int(!(gms > 0) * isVer);
-                y = rpm.y - int((gmc > 0) * !isVer);
-                if (mapchar[y][x] != ' ') {
-                    point.setPosition(rp);
-                    raypoints.push_back(point);
+                if(mapchar[rpi.y - (gmc == 1?1:0)][rpi.x] != ' '){
+                    horizontal = {rpx, rpy};
+                    //sqrt((ppos.x - rpx) * (ppos.x - rpx) + (ppos.y - rpy) * (ppos.y - rpy));
                     break;
                 }
             }
-        }
+            point.setPosition(min(vertical, horizontal, [ppos](Vector2f a, Vector2f b){
+                a.x -= ppos.x; a.y -= ppos.y;
+                b.x -= ppos.x; b.y -= ppos.y;
+                return sqrt(a.x * a.x + a.y * a.y) < sqrt(b.x * b.x + b.y * b.y); }));
 
-        for (auto p : raypoints) {
-            float x = ppos.x - p.getPosition().x;
-            float y = ppos.y - p.getPosition().y;
+            raypoints.push_back(point);
+            
+            float x = ppos.x - point.getPosition().x;
+            float y = ppos.y - point.getPosition().y;
 
-            float len = sqrt(x*x + y*y);
-            lens.push_back(len);
-        }
+            lens.push_back(sqrt(x*x + y*y));
 
 
         ;//MOVING & STEERING
