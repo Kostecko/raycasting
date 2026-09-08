@@ -316,7 +316,7 @@ int main() {
             float y = ppos.y - point.getPosition().y;
 
             lens.push_back(sqrt(x*x + y*y));
-
+        }
 
         ;//MOVING & STEERING
         {
