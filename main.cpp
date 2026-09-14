@@ -54,7 +54,7 @@ struct Vector2b
 struct rayCast{
     Vector2f position;
     float length;
-    float angle;
+    Angle angle;
     bool isVertical;
 };
 
@@ -199,12 +199,12 @@ int main() {
                 };
                 Vector2f side = {
                     rayDir.x < 0 ?
-                    abs(rayDir.x) < 0.00001f ? INFINITY : (ppos.x - ppom.x * _cellsize) / abs(rayDir.x) :
-                    abs(rayDir.x) < 0.00001f ? INFINITY : ((ppom.x + 1) * _cellsize - ppos.x) / abs(rayDir.x),
+                    delta.x == INFINITY ? INFINITY : (ppos.x - ppom.x * _cellsize) / abs(rayDir.x) :
+                    delta.x == INFINITY ? INFINITY : ((ppom.x + 1) * _cellsize - ppos.x) / abs(rayDir.x),
 
                     rayDir.y < 0 ?
-                    abs(rayDir.y) < 0.00001f ? INFINITY : (ppos.y - ppom.y * _cellsize) / abs(rayDir.y) :
-                    abs(rayDir.y) < 0.00001f ? INFINITY : ((ppom.y + 1) * _cellsize - ppos.y) / abs(rayDir.y)
+                    delta.y == INFINITY ? INFINITY : (ppos.y - ppom.y * _cellsize) / abs(rayDir.y) :
+                    delta.y == INFINITY ? INFINITY : ((ppom.y + 1) * _cellsize - ppos.y) / abs(rayDir.y)
                 };
 
                 bool hit = false;
@@ -214,7 +214,8 @@ int main() {
                         mapX += step.x;
 
                         if(mapchar[mapY][mapX] != ' '){
-                            rays.push_back({{ppos.x + rayDir.x * side.x, ppos.y + rayDir.y * side.x}, side.x, angrad, true});
+                            Vector2f position = {ppos.x + rayDir.x * side.x, ppos.y + rayDir.y * side.x};
+                            rays.push_back({position, side.x, degrees(f), true});
                             hit = true;
                         }
                         side.x += delta.x;
@@ -223,7 +224,8 @@ int main() {
                         mapY += step.y;
 
                         if(mapchar[mapY][mapX] != ' '){
-                            rays.push_back({{ppos.x + rayDir.x * side.y, ppos.y + rayDir.y * side.y}, side.y, angrad, false});
+                            Vector2f position = {ppos.x + rayDir.x * side.y, ppos.y + rayDir.y * side.y};
+                            rays.push_back({position, side.y, degrees(f), false});
                             hit = true;
                         }
                         side.y += delta.y;
@@ -273,7 +275,8 @@ int main() {
             RectangleShape block;
             block.setFillColor(Color::Blue);
             for (int i = 0; i < rays.size(); i++) {
-                float scale = 20.0 / rays[i].length;
+                float correctedLength = rays[i].length * cos(rays[i].angle.asRadians());
+                float scale = 20.0 / correctedLength;
                 float chunkwidth = float(_winwidth) / float(rays.size());
                 float chunkheight = _winheight * scale;
 
