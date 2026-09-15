@@ -4,6 +4,7 @@
 #include <numbers>
 #include <cmath>
 #include <algorithm>
+#include <unordered_map>
 
 using namespace std;
 using namespace sf;
@@ -23,12 +24,12 @@ const float fovaccuracy = 120;
 const vector<string> mapchar = {
     "##########",
     "#        #",
-    "# ##  ## #",
-    "##      ##",
-    "#  #  #  #",
+    "# YY  YY #",
+    "#Y      Y#",
+    "#  M  M  #",
     "#        #",
-    "#  #  #  #",
-    "#  ####  #",
+    "#  G  G  #",
+    "#  GGGG  #",
     "#        #",
     "##########"
 };
@@ -56,6 +57,7 @@ struct ray{
     float length;
     Angle angle;
     bool isVertical;
+    Color color;
 };
 
 Vector2i toMapPos(Vector2f pos){
@@ -64,12 +66,17 @@ Vector2i toMapPos(Vector2f pos){
     return { int(pos.x / _cellsize), int(pos.y / _cellsize) };
 }
 
-Vector2b collision(Vector2f pos, Vector2f dir, float dt) {
+Vector2b collision(Vector2f pos, Vector2f dir, float radius, float dt) {
     Vector2i oldpos = toMapPos(pos);
-    pos = {pos.x + dir.x * speed * dt, pos.y + dir.y * speed * dt};
+    pos = {pos.x + dir.x * speed * dt + dir.x * radius, pos.y + dir.y * speed * dt + dir.y * radius};
     Vector2i newpos = toMapPos(pos);
 
-    return { mapchar[oldpos.y][newpos.x] != ' ', mapchar[newpos.y][oldpos.x] != ' '};
+
+    bool hitX = mapchar[oldpos.y][newpos.x] != ' ';
+    bool hitY = mapchar[newpos.y][oldpos.x] != ' ';
+    bool hitDiag = mapchar[newpos.y][newpos.x] != ' ';
+
+    return {hitX || hitDiag, hitY || hitDiag};
 }
 
 
@@ -104,12 +111,40 @@ int main() {
     CircleShape point(2.5);
     point.setOrigin({ 2.5,2.5 });
 
-    Font font("assets/Retro.ttf");
+    RectangleShape floor_({_winwidth, _winheight/2});
+    floor_.setPosition({0, _winheight/2});
+    floor_.setFillColor(Color(100, 100, 100));
+
+    //Font font("assets/Retro.ttf");
     
     vector<RectangleShape>map;
     vector<ray> rays;
     vector<RectangleShape>gridLines;
 
+    unordered_map<char, Color> cell_t{
+        {'#', Color::Blue},
+        {'Y', Color::Yellow},
+        {'G', Color::Green},
+        {'M', Color::Magenta}
+    };
+
+    //2D MAP GRID
+    {
+        RectangleShape gridLine;
+        gridLine.setFillColor(Color(50, 50, 50));
+
+        gridLine.setSize({_winwidth, 1});
+        for (int y = 0; y <= _winheight / _cellsize; y++) {
+            gridLine.setPosition({0, y * float(_cellsize)});
+            gridLines.push_back(gridLine);
+        }
+
+        gridLine.setSize({1, _winheight});
+        for (int x = 0; x <= _winwidth / _cellsize; x++) {
+            gridLine.setPosition({x * float(_cellsize), 0 });
+            gridLines.push_back(gridLine);
+        }
+    }
 
     while (window2d.isOpen() && window3d.isOpen()) {
         while (const optional event = window2d.pollEvent()){
@@ -126,8 +161,8 @@ int main() {
 
         //VARIABLES
         {
-            window2d.setTitle("2D\tFPS: " + to_string(int(1.f / dt)));
             dt = clock.restart().asSeconds();
+            window2d.setTitle("2D\tFPS: " + to_string(int(1.f / dt)));
 
             protrad = player.getRotation().asRadians();
             protdeg = player.getRotation().asDegrees();
@@ -135,28 +170,8 @@ int main() {
 
             map.clear();
             rays.clear();
-            gridLines.clear();
-        }
-
-        //2D MAP GRID
-        if (grid){
-            RectangleShape gridLine;
-            gridLine.setFillColor(Color(50, 50, 50));
-
-            gridLine.setSize({_winwidth, 1});
-            for (int y = 0; y <= _winheight / _cellsize; y++) {
-                gridLine.setPosition({0, y * float(_cellsize)});
-                gridLines.push_back(gridLine);
-            }
-
-            gridLine.setSize({1, _winheight});
-            for (int x = 0; x <= _winwidth / _cellsize; x++) {
-                gridLine.setPosition({x * float(_cellsize), 0 });
-                gridLines.push_back(gridLine);
-            }
         }
         
-
         //RAYCASTER
         {
             Vector2i ppom = toMapPos(ppos);
@@ -195,7 +210,7 @@ int main() {
 
                         if(mapchar[mapY][mapX] != ' '){
                             Vector2f position = {ppos.x + rayDir.x * side.x, ppos.y + rayDir.y * side.x};
-                            rays.push_back({position, side.x, degrees(f), true});
+                            rays.push_back({position, side.x, degrees(f), true, cell_t[mapchar[mapY][mapX]]});
                             hit = true;
                         }
                         side.x += delta.x;
@@ -205,7 +220,7 @@ int main() {
 
                         if(mapchar[mapY][mapX] != ' '){
                             Vector2f position = {ppos.x + rayDir.x * side.y, ppos.y + rayDir.y * side.y};
-                            rays.push_back({position, side.y, degrees(f), false});
+                            rays.push_back({position, side.y, degrees(f), false, cell_t[mapchar[mapY][mapX]]});
                             hit = true;
                         }
                         side.y += delta.y;
@@ -219,8 +234,12 @@ int main() {
                         bool hitDiag = mapchar[diagY][diagX] != ' ';
 
                         if(hitX || hitY || hitDiag){
+                            Color _color = hitX ? cell_t[mapchar[mapY][diagX]] : 
+                                (hitY ? cell_t[mapchar[diagY][mapX]] : 
+                                cell_t[mapchar[diagY][diagX]]);
+
                             Vector2f position = {ppos.x + rayDir.x * side.x, ppos.y + rayDir.y * side.x};
-                            rays.push_back({position, side.x, degrees(f), true});
+                            rays.push_back({position, side.x, degrees(f), true, _color});
                             hit = true;
                         }
                         mapX = diagX;
@@ -253,34 +272,33 @@ int main() {
             
             if (Keyboard::isKeyPressed(Keyboard::Key::D)) dir += {_cos, _sin};
 
-            float len2 = hypot(dir.x, dir.y);
+            float len = hypot(dir.x, dir.y);
 
-            if(len2 > 1e-6f){
-                dir /= sqrt(len2);
-                Vector2b col = collision(ppos, dir, dt);
+            if(len > 1e-6f){
+                dir /= len;
+                Vector2b col = collision(ppos, dir, player.getRadius() ,dt);
                 player.move({!col.x * dir.x * speed * dt, !col.y * dir.y * speed * dt});
             }
         }
         
         //3D RENDER
         if(win3dVisible){
-            
-                RectangleShape block;
-                block.setFillColor(Color::Blue);
-                for (int i = 0; i < rays.size(); i++) {
-                    float correctedLength = rays[i].length * cos(rays[i].angle.asRadians());
-                    float scale = 20.0 / correctedLength;
-                    float chunkwidth = float(_winwidth) / float(rays.size());
-                    float chunkheight = _winheight * scale;
+            RectangleShape block;
+            block.setFillColor(Color::Blue);
+            for (int i = 0; i < rays.size(); i++) {
+                float correctedLength = rays[i].length * cos(rays[i].angle.asRadians());
+                float scale = 20.0 / correctedLength;
+                float chunkwidth = float(_winwidth) / float(rays.size());
+                float chunkheight = _winheight * scale;
 
-                    block.setSize({chunkwidth,chunkheight});
-                    block.setOrigin({ 0, chunkheight / 2 });
-                    block.setPosition({ i * chunkwidth, _winheight/2});
+                block.setSize({chunkwidth,chunkheight});
+                block.setOrigin({ 0, chunkheight / 2 });
+                block.setPosition({ i * chunkwidth, _winheight/2});
 
-                    if(rays[i].isVertical) block.setFillColor(Color(0, 0, 255));
-                    else block.setFillColor(Color(0, 0, 200));
+                if(rays[i].isVertical) block.setFillColor(rays[i].color);
+                else block.setFillColor(rays[i].color * Color(150, 150, 150));
 
-                    map.push_back(block);
+                map.push_back(block);
             }
         }
 
@@ -296,7 +314,7 @@ int main() {
                             cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
                             window2d.draw(cellshape);
                         }
-                        else if (mapchar[y][x] == 'C') {
+                        else if (mapchar[y][x] == 'Y') {
                             cellshape.setFillColor(Color::Yellow);
                             cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
                             window2d.draw(cellshape);
@@ -330,10 +348,10 @@ int main() {
 
             //3D VIEW
             if(win3dVisible){
-                window3d.clear();
+                window3d.clear(Color(0, 153, 153));
+                window3d.draw(floor_);
                 for (auto& b : map)
                     window3d.draw(b);
-
                 window3d.display();
             }
         }
