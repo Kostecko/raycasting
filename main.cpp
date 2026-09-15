@@ -51,7 +51,7 @@ struct Vector2b
     bool y;
 };
 
-struct rayCast{
+struct ray{
     Vector2f position;
     float length;
     Angle angle;
@@ -81,6 +81,12 @@ int getMark(float angle) {
     return 0;
 }
 
+void my_move(CircleShape *player, Vector2f offset, Vector2i dir, float dt){
+    Vector2f position = player->getPosition();
+    Vector2b col = collision(position, player->getRadius(), offset, dt);
+    player->move({offset.x * dir.x * speed * dt * !col.x, offset.y * dir.y * speed * dt * !col.y});
+}
+
 //MAIN
 
 int main() {
@@ -90,44 +96,34 @@ int main() {
     window2d.setVisible(win2dVisible);
     window3d.setVisible(win3dVisible);
     
-
     Clock clock;
     float dt=0;
 
     float protrad;
     float protdeg;
-    float gms;
-    float gmc;
-
-    bool moving = false;
+    Vector2f ppos;
 
     RectangleShape cellshape(Vector2f(_cellsize, _cellsize));
-    RectangleShape line({ 1, 200 });
-    CircleShape player(10.f);
-    CircleShape point(2.5);
-
-    Font font("assets/Retro.ttf");
-
-    Vector2f offset;
-    Vector2f ppos;
-    Texture ptxt;
-
-    vector<RectangleShape>map;
-
-    vector<rayCast> rays;
-
-    vector<RectangleShape>gridLines;
-
-    ptxt.loadFromFile("assets/triangle.png");
-
     cellshape.setFillColor(Color::Blue);
 
+    Texture ptxt;
+    ptxt.loadFromFile("assets/triangle.png");
+    
+    CircleShape player(10.f);
     player.setOrigin({10, 10});
     player.setPosition({440, 440});
     player.setTexture(&ptxt);
     player.setRotation(degrees(30));
 
+    CircleShape point(2.5);
     point.setOrigin({ 2.5,2.5 });
+
+    Font font("assets/Retro.ttf");
+    
+    vector<RectangleShape>map;
+    vector<ray> rays;
+    vector<RectangleShape>gridLines;
+
 
     while (window2d.isOpen() && window3d.isOpen()) {
         while (const optional event = window2d.pollEvent()){
@@ -157,25 +153,23 @@ int main() {
         }
 
         //2D MAP GRID
-        {
-            if (grid) {
-                RectangleShape gridLine;
-                gridLine.setFillColor(Color(50, 50, 50));
+        if (grid){
+            RectangleShape gridLine;
+            gridLine.setFillColor(Color(50, 50, 50));
 
-                gridLine.setSize({_winwidth, 1});
-                for (int y = 0; y <= _winheight / _cellsize; y++) {
-                    gridLine.setPosition({0, y * float(_cellsize)});
-                    gridLines.push_back(gridLine);
-                }
+            gridLine.setSize({_winwidth, 1});
+            for (int y = 0; y <= _winheight / _cellsize; y++) {
+                gridLine.setPosition({0, y * float(_cellsize)});
+                gridLines.push_back(gridLine);
+            }
 
-                gridLine.setSize({1, _winheight});
-                for (int x = 0; x <= _winwidth / _cellsize; x++) {
-                    gridLine.setPosition({x * float(_cellsize), 0 });
-                    gridLines.push_back(gridLine);
-                }
+            gridLine.setSize({1, _winheight});
+            for (int x = 0; x <= _winwidth / _cellsize; x++) {
+                gridLine.setPosition({x * float(_cellsize), 0 });
+                gridLines.push_back(gridLine);
             }
         }
-
+        
 
         //RAYCASTER
         {
@@ -194,17 +188,17 @@ int main() {
                     rayDir.y < 0 ? -1 : 1,
                 };
                 Vector2f delta = {
-                    abs(rayDir.x) < 0.000001f ? INFINITY : float(_cellsize) / abs(rayDir.x),
-                    abs(rayDir.y) < 0.000001f ? INFINITY : float(_cellsize) / abs(rayDir.y),
+                    abs(rayDir.x) < 1e-6f ? INFINITY : float(_cellsize) / abs(rayDir.x),
+                    abs(rayDir.y) < 1e-6f ? INFINITY : float(_cellsize) / abs(rayDir.y),
                 };
                 Vector2f side = {
                     rayDir.x < 0 ?
-                    delta.x == INFINITY ? INFINITY : (ppos.x - ppom.x * _cellsize) / abs(rayDir.x) :
-                    delta.x == INFINITY ? INFINITY : ((ppom.x + 1) * _cellsize - ppos.x) / abs(rayDir.x),
+                    delta.x == INFINITY ? delta.x : (ppos.x - ppom.x * _cellsize) / abs(rayDir.x) :
+                    delta.x == INFINITY ? delta.x : ((ppom.x + 1) * _cellsize - ppos.x) / abs(rayDir.x),
 
                     rayDir.y < 0 ?
-                    delta.y == INFINITY ? INFINITY : (ppos.y - ppom.y * _cellsize) / abs(rayDir.y) :
-                    delta.y == INFINITY ? INFINITY : ((ppom.y + 1) * _cellsize - ppos.y) / abs(rayDir.y)
+                    delta.y == INFINITY ? delta.y : (ppos.y - ppom.y * _cellsize) / abs(rayDir.y) :
+                    delta.y == INFINITY ? delta.y : ((ppom.y + 1) * _cellsize - ppos.y) / abs(rayDir.y)
                 };
 
                 bool hit = false;
@@ -236,117 +230,107 @@ int main() {
 
         //MOVING & STEERING
         {
+            if (Keyboard::isKeyPressed(Keyboard::Key::Right)) player.rotate(degrees(rotspeed * dt));
+            if (Keyboard::isKeyPressed(Keyboard::Key::Left)) player.rotate(degrees(-rotspeed * dt));
+            
+            float _sin = sin(protrad);
+            float _cos = cos(protrad);
+            
+            Vector2f dir{0.f,0.f}; 
 
-            if (Keyboard::isKeyPressed(Keyboard::Key::Right)) {
-                player.rotate(degrees(rotspeed * dt));
-            }
-            if (Keyboard::isKeyPressed(Keyboard::Key::Left)) {
-                player.rotate(degrees(-rotspeed * dt));
-            }
+            if(Keyboard::isKeyPressed(Keyboard::Key::W) || 
+            Keyboard::isKeyPressed(Keyboard::Key::Up)) dir += {_sin, -_cos};
+            
+            if(Keyboard::isKeyPressed(Keyboard::Key::S) || 
+            Keyboard::isKeyPressed(Keyboard::Key::Down)) dir += {-_sin, _cos};
 
-            if (Keyboard::isKeyPressed(Keyboard::Key::W) || Keyboard::isKeyPressed(Keyboard::Key::Up)) {
-                offset = { sin(protrad), -cos(protrad) };
-                moving = true;
+            if (Keyboard::isKeyPressed(Keyboard::Key::A)) dir += {-_cos, -_sin};
+            
+            if (Keyboard::isKeyPressed(Keyboard::Key::D)) dir += {_cos, _sin};
+
+            float len2 = hypot(dir.x, dir.y);
+
+            if(len2 > 1e-6f){
+                dir /= sqrt(len2);
+                Vector2b col = collision(ppos, player.getRadius(), dir, dt);
+                player.move({!col.x * dir.x * speed * dt, !col.y * dir.y * speed * dt});
             }
-            if (Keyboard::isKeyPressed(Keyboard::Key::S) || Keyboard::isKeyPressed(Keyboard::Key::Down)) {
-                offset = { -sin(protrad), cos(protrad) };
-                moving = true;
-            }
-            if (Keyboard::isKeyPressed(Keyboard::Key::A)) {
-                offset = { -cos(protrad), -sin(protrad) };
-                moving = true;
-            }
-            if (Keyboard::isKeyPressed(Keyboard::Key::D)) {
-                offset = { cos(protrad), sin(protrad) };
-                moving = true;
-            }
-            if (moving) {
-                Vector2b col = collision(ppos, player.getRadius(), offset, dt);
-                player.move({ offset.x * speed * dt * !col.x, offset.y * speed * dt * !col.y });
-            }
-            moving = false;
         }
-
-
         
         //3D RENDER
-        
-        {
-            RectangleShape block;
-            block.setFillColor(Color::Blue);
-            for (int i = 0; i < rays.size(); i++) {
-                float correctedLength = rays[i].length * cos(rays[i].angle.asRadians());
-                float scale = 20.0 / correctedLength;
-                float chunkwidth = float(_winwidth) / float(rays.size());
-                float chunkheight = _winheight * scale;
+        if(win3dVisible){
+            
+                RectangleShape block;
+                block.setFillColor(Color::Blue);
+                for (int i = 0; i < rays.size(); i++) {
+                    float correctedLength = rays[i].length * cos(rays[i].angle.asRadians());
+                    float scale = 20.0 / correctedLength;
+                    float chunkwidth = float(_winwidth) / float(rays.size());
+                    float chunkheight = _winheight * scale;
 
-                block.setSize({chunkwidth,chunkheight});
-                block.setOrigin({ 0, chunkheight / 2 });
-                block.setPosition({ i * chunkwidth, _winheight/2});
+                    block.setSize({chunkwidth,chunkheight});
+                    block.setOrigin({ 0, chunkheight / 2 });
+                    block.setPosition({ i * chunkwidth, _winheight/2});
 
-                if(rays[i].isVertical) block.setFillColor(Color(0, 0, 255));
-                else block.setFillColor(Color(0, 0, 200));
+                    if(rays[i].isVertical) block.setFillColor(Color(0, 0, 255));
+                    else block.setFillColor(Color(0, 0, 200));
 
-                map.push_back(block);
+                    map.push_back(block);
             }
         }
 
-
-        
         //DRAWING
         {
-            window2d.clear();
-            window3d.clear();
-
             //2D VIEW
-            for (int y = 0; y < _winheight / _cellsize; y++) {
-                for (int x = 0; x < _winheight / _cellsize; x++) {
-                    if (mapchar[y][x] == '#') {
-                        cellshape.setFillColor(Color::Blue);
-                        cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
-                        window2d.draw(cellshape);
-                    }
-                    else if (mapchar[y][x] == 'C') {
-                        cellshape.setFillColor(Color::Yellow);
-                        cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
-                        window2d.draw(cellshape);
-                    }
-                    else if (mapchar[y][x] == 'G') {
-                        cellshape.setFillColor(Color::Green);
-                        cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
-                        window2d.draw(cellshape);
-                    }
-                    else if (mapchar[y][x] == 'M') {
-                        cellshape.setFillColor(Color::Magenta);
-                        cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
-                        window2d.draw(cellshape);
-                    }
-                    else if (mapchar[y][x] == ' ') {
-                        continue;
+            if(win2dVisible){
+                window2d.clear();
+                for (int y = 0; y < _winheight / _cellsize; y++) {
+                    for (int x = 0; x < _winheight / _cellsize; x++) {
+                        if (mapchar[y][x] == '#') {
+                            cellshape.setFillColor(Color::Blue);
+                            cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
+                            window2d.draw(cellshape);
+                        }
+                        else if (mapchar[y][x] == 'C') {
+                            cellshape.setFillColor(Color::Yellow);
+                            cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
+                            window2d.draw(cellshape);
+                        }
+                        else if (mapchar[y][x] == 'G') {
+                            cellshape.setFillColor(Color::Green);
+                            cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
+                            window2d.draw(cellshape);
+                        }
+                        else if (mapchar[y][x] == 'M') {
+                            cellshape.setFillColor(Color::Magenta);
+                            cellshape.setPosition(Vector2f(_cellsize * x, _cellsize * y));
+                            window2d.draw(cellshape);
+                        }
+                        else if (mapchar[y][x] == ' ') {
+                            continue;
+                        }
                     }
                 }
+                if (grid) for (auto& g : gridLines) window2d.draw(g);
+
+                window2d.draw(player);
+
+                for (auto& p : rays){
+                    point.setPosition(p.position);
+                    window2d.draw(point);
+                }
+
+                window2d.display();
             }
-
-            if (grid)
-                for (auto& g : gridLines)
-                    window2d.draw(g);
-
-            window2d.draw(player);
-
-            for (auto& p : rays){
-                point.setPosition(p.position);
-                window2d.draw(point);
-            }
-            
-            
 
             //3D VIEW
+            if(win3dVisible){
+                window3d.clear();
+                for (auto& b : map)
+                    window3d.draw(b);
 
-            for (auto& b : map)
-                window3d.draw(b);
-
-            window2d.display();
-            window3d.display();
+                window3d.display();
+            }
         }
     }
     return 0;
