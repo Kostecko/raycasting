@@ -58,34 +58,20 @@ struct ray{
     bool isVertical;
 };
 
-Vector2b collision(Vector2f pos, float radius, Vector2f offset, float dt) {
-    int oldx = floor((pos.x + offset.x * radius) / _cellsize);
-    int oldy = floor((pos.y + offset.y * radius) / _cellsize);
-
-    //OLD POS + MOVE + RADIUS
-    int newx = floor((pos.x + offset.x * dt * speed + offset.x * radius)/_cellsize);
-    int newy = floor((pos.y + offset.y * dt * speed + offset.y * radius)/_cellsize);
-
-    return { mapchar[oldy][newx] == '#', mapchar[newy][oldx] == '#' };
-}
-
 Vector2i toMapPos(Vector2f pos){
     if (pos.x < 0 || pos.x >= _winwidth || pos.y < 0 || pos.y >= _winheight || !isfinite(pos.x) || !isfinite(pos.y)) return { -1,-1 };
 
     return { int(pos.x / _cellsize), int(pos.y / _cellsize) };
 }
 
-int getMark(float angle) {
-    if (angle < 0) return -1;
-    if (angle > 0) return 1;
-    return 0;
+Vector2b collision(Vector2f pos, Vector2f dir, float dt) {
+    Vector2i oldpos = toMapPos(pos);
+    pos = {pos.x + dir.x * speed * dt, pos.y + dir.y * speed * dt};
+    Vector2i newpos = toMapPos(pos);
+
+    return { mapchar[oldpos.y][newpos.x] != ' ', mapchar[newpos.y][oldpos.x] != ' '};
 }
 
-void my_move(CircleShape *player, Vector2f offset, Vector2i dir, float dt){
-    Vector2f position = player->getPosition();
-    Vector2b col = collision(position, player->getRadius(), offset, dt);
-    player->move({offset.x * dir.x * speed * dt * !col.x, offset.y * dir.y * speed * dt * !col.y});
-}
 
 //MAIN
 
@@ -214,7 +200,7 @@ int main() {
                         }
                         side.x += delta.x;
                     }
-                    else{
+                    else if(side.y < side.x){
                         mapY += step.y;
 
                         if(mapchar[mapY][mapX] != ' '){
@@ -223,6 +209,25 @@ int main() {
                             hit = true;
                         }
                         side.y += delta.y;
+                    }
+                    else{
+                        int diagX = mapX + step.x;
+                        int diagY = mapY + step.y;
+
+                        bool hitX = mapchar[mapY][diagX] != ' ';
+                        bool hitY = mapchar[diagY][mapX] != ' ';
+                        bool hitDiag = mapchar[diagY][diagX] != ' ';
+
+                        if(hitX || hitY || hitDiag){
+                            Vector2f position = {ppos.x + rayDir.x * side.x, ppos.y + rayDir.y * side.x};
+                            rays.push_back({position, side.x, degrees(f), true});
+                            hit = true;
+                        }
+                        mapX = diagX;
+                        mapY = diagY;
+                        
+                        side.y +=delta.y;
+                        side.x +=delta.x;
                     }
                 }
             }
@@ -252,7 +257,7 @@ int main() {
 
             if(len2 > 1e-6f){
                 dir /= sqrt(len2);
-                Vector2b col = collision(ppos, player.getRadius(), dir, dt);
+                Vector2b col = collision(ppos, dir, dt);
                 player.move({!col.x * dir.x * speed * dt, !col.y * dir.y * speed * dt});
             }
         }
